@@ -1,0 +1,182 @@
+//Adapted by Ovidiu - 2021 
+//@version=4
+
+study("All in one [Ovidiu]")
+indi = input(defval = 'RSI', title = "Indicator", options =['RSI', 'MACD', 'Stoch', 'Mayer', 'SMI'], group="Select Indicator")
+src = input(close, title = "Source", group="Select Indicator")
+srcmfi = (hlc3)
+
+//////////////////////////INPUTS/////////////////////////////
+rsilen = input(defval=14, minval=1, title = "RSI Length", group="RSI Settings")
+rsicc = input(true, title="Change RSI color when overbought/oversold?", group="RSI Settings")
+rsiletters = input(false, title="Show letters 'S' and 'B' when RSI is overbought/oversold?", group="RSI Settings")
+
+stochlen = input(defval=14, minval=1, title="Stoch Length", group="Stoch Settings") 
+smoothK = input(defval=3, minval=1, title="Smooth K Stoch", group="Stoch Settings")
+smoothD = input(defval=3, minval=1, title="Smooth D Stoch", group="Stoch Settings")
+stochletters = input(false, title="Show letters 'S' and 'B' when Stoch crosses in overbought/oversold zone?", group="Stoch Settings")
+stochch = input(false, title="Show Background Highlights only when Stoch crosses in overbought/oversold zone", group="Stoch Settings")
+stochac = input(false, title="Show Background Highlights everytime the Stoch crosses?", group="Stoch Settings")
+stochbh = input(false, title="Show Background Highlights when Stoch is overbought/oversold?", group="Stoch Settings")
+
+bblen = input(20, title="BB Lenght", group="Squeeze Momentum Indicator Settings")
+mult = input(2.0,title="MultiFactor BB", group="Squeeze Momentum Indicator Settings")
+kclen=input(20, title="KC Length", group="Squeeze Momentum Indicator Settings")
+multkc = input(1.5, title="MultiFactor KC para SMI", group="Squeeze Momentum Indicator Settings")
+useTrueRange = input(true, title="Use TrueRange for Keltner Channel?", group="Squeeze Momentum Indicator Settings")
+
+mayerlen = input(200, title="Mayer Price SMA Length", group="Mayer Multiple Settings")
+mayeroverbought = input(2.4, title="Mayer Overbought Threshold", group="Mayer Multiple Settings")
+mayeroversold = input(1.0, title="Mayer Oversold Threshold", group="Mayer Multiple Settings")
+
+fast_length = input(title="Fast Length", type=input.integer, defval=12, group="MACD Settings")
+slow_length = input(title="Slow Length", type=input.integer, defval=26, group="MACD Settings")
+macd_src = input(title="Source", type=input.source, defval=close, group="MACD Settings")
+signal_length = input(title="Signal Smoothing", type=input.integer, minval = 1, maxval = 50, defval = 9, group="MACD Settings")
+sma_source = input(title="Simple MA (Oscillator)", type=input.bool, defval=false, group="MACD Settings")
+sma_signal = input(title="Simple MA (Signal Line)", type=input.bool, defval=false, group="MACD Settings")
+
+
+//Squeeze Momentum Indicator [by LazyBear]
+//Bollinger Bands
+basis = sma(src, bblen)
+dev = multkc * stdev(src, bblen)
+upperbb = basis + dev
+lowerbb = basis - dev
+
+//Keltner Channel
+bbma = sma(src, kclen)
+bbrange = useTrueRange ? tr : (high - low)
+bbrangema = sma(bbrange, kclen)
+upperkc = bbma + bbrangema * multkc
+lowerkc = bbma - bbrangema * multkc
+
+//Squeeze ON/OFF
+sqzOn  = (lowerbb > lowerkc) and (upperbb < upperkc)
+sqzOff = (lowerbb < lowerkc) and (upperbb > upperkc)
+noSqz  = (sqzOn == false) and (sqzOff == false)
+
+//Mayer Multiple [by Ovidiu]
+mayermultiple = close / (sma(close, mayerlen))
+sell_signal = mayermultiple > mayeroverbought
+buy_signal = mayermultiple < mayeroversold
+plot_color = sell_signal ? color.red : buy_signal ? color.green : color.yellow
+
+//MACD [by Ovidiu]
+fast_ma = sma_source ? sma(macd_src, fast_length) : ema(macd_src, fast_length)
+slow_ma = sma_source ? sma(macd_src, slow_length) : ema(macd_src, slow_length)
+macd = fast_ma - slow_ma
+signal = sma_signal ? sma(macd, signal_length) : ema(macd, signal_length)
+hist = macd - signal
+
+/////////////////INDICATOR FORMULAS/////////////////////////
+Rsi = rsi(src, rsilen)
+Stochk = sma(stoch(close, high, low, stochlen), smoothK)
+Stochd = sma(Stochk, smoothD)
+Smi = linreg(src  -  avg(avg(highest(high, kclen), lowest(low, kclen)), sma(close,kclen)), kclen, 0)
+
+//////////////////////SETTINGS/////////////////////////
+//RSI SETTINGS
+//Define overbought/oversold zone
+RSIAboveLine = Rsi > 70 ? 1 : 0
+RSIBelowLine = Rsi < 30 ? 1 : 0
+
+//Div. RSI
+
+
+//STOCH SETTINGS
+//Define overbought/oversold zone
+StochAboveLine = Stochk > 80 ? 1 : 0
+StochBelowLine = Stochk < 20 ? 1 : 0
+
+//Define cross in overbought/oversold zone
+stochcrossUp = (Stochk[1] < Stochd[1] and Stochk[1] < 20[1]) and (Stochk > Stochd)  ? 1 : 0
+stochcrossDn = (Stochk[1] > Stochd[1] and Stochk[1] > 80[1]) and (Stochk < Stochd) ? 1 : 0
+
+//Define any cross
+stochcrossUpAll = (Stochk[1] < Stochd[1] and Stochk > Stochd) ? 1 : 0
+stochcrossDownAll = (Stochk[1] > Stochd[1] and Stochk < Stochd) ? 1 : 0
+
+
+/////////////////////PLOTS SETTINGS////////////////////////
+//Indicator lines
+line1 = indi == 'RSI' ? Rsi : na
+line5 = indi == 'Stoch' ? Stochk : na
+line6 = indi == 'Stoch' ? Stochd : na
+line7 = indi == 'SMI' ? Smi : na
+line8 = indi == 'SMI' ? 0 : na
+line10 = indi == 'Mayer' ? mayermultiple : na
+line11 = indi == 'Mayer' ? mayeroverbought : na
+line12 = indi == 'Mayer' ? mayeroversold : na
+line13 = indi == 'MACD' ? hist : na
+line14 = indi == 'MACD' ? macd : na
+line15 = indi == 'MACD' ? signal : na
+
+///////////////////OVERBOUGHT & OVERSOLD///////////////////
+hline1 = indi == 'RSI' ? 70 :
+   indi == 'Stoch' ? 80 : na
+
+hline2 = indi == 'RSI' ? 30 :
+   indi == 'Stoch' ? 20 : na
+
+/////////////////COLORS DEFINITIONS///////////////////////
+//colors
+green = #26a69a
+darkgreen = #004d40
+red = #ef5350
+darkred = #b71c1c
+blue = #0000FF
+blue2 = #2196F3
+black = #000000
+gray1 = #808080
+gray2 = #555555
+purple = #787ff6
+yellow = #FFFF00
+white = #ffffff
+
+//MACD colors
+col_grow_above = #26A69A
+col_grow_below = #FFCDD2
+col_fall_above = #B2DFDB
+col_fall_below = #EF5350
+col_macd = #0094ff
+col_signal = #ff6a00
+
+rsicolor = 30 < Rsi and Rsi < 70 ? #e91e63 : #808080
+smicolor = iff( Smi > 0, iff( Smi > nz(Smi[1]), green, darkgreen), iff( Smi < nz(Smi[1]), red, darkred))
+sqzcolor = noSqz ? blue : sqzOn ? white : gray1
+mayercolor = sell_signal ? red : buy_signal ? green : yellow
+
+/////////////////////////////PLOTS///////////////////////////
+h1 = hline(hline1)
+h2 = hline(hline2)
+plot(line1, color = rsicolor, transp = 0, title="RSI")
+plot(line5, color = blue2, transp = 0, title="K Stoch")
+plot(line6, color = red, transp = 0, title="D Stoch")
+plot(cross(Stochd, Stochk) and indi == 'Stoch' ? Stochk : na, title="Stoch Cross", color = #64ffda, transp=0, style=plot.style_circles, linewidth = 2)
+plot(line7, color = smicolor, transp = 30, style=plot.style_histogram, linewidth=2)
+plot(line8, color = sqzcolor, transp = 30, style=plot.style_line, linewidth=2)
+plot(line10, title='Mayer Multiple', color=plot_color, style=plot.style_histogram, linewidth=4)
+plot(line11, title='Threshold', color=red)
+plot(line12, title='Undervalued', color = green)
+plot(line13, title="Histogram", style=plot.style_columns, color=(hist>=0 ? (hist[1] < hist ? col_grow_above : col_fall_above) : (hist[1] < hist ? col_grow_below : col_fall_below) ), transp=0 )
+plot(line14, title="MACD", color=col_macd, transp=0)
+plot(line15, title="Signal", color=col_signal, transp=0)
+
+plotchar(crossover(Rsi,70) and indi == 'RSI' and rsiletters ? Rsi : na, title="RSI Sell Signal", char='S', location=location.top, color=#808080, transp=0, offset=0)
+plotchar(crossunder(Rsi,30) and indi == 'RSI' and rsiletters ? Rsi : na, title="RSI Buy Signal", char='B', location=location.bottom, color=#808080, transp=0, offset=0)
+plotchar(indi == 'Stoch' and stochletters and stochcrossUp ? stochcrossUp : na, title="Stoch Buy Signal", char='B', location=location.bottom, color=#808080, transp=0, offset=0)
+plotchar(indi == 'Stoch' and stochletters and stochcrossDn ? stochcrossDn : na, title="Stoch Sell Signal", char='S', location=location.top, color=#808080, transp=0, offset=0)
+
+/////////////////////////BACKGROUNDS///////////////////////////
+fill(h1, h2, color = #9915ff, transp = 90, title="Background fill")
+
+//Background color for stoch in overbought/oversold zone
+bgcolor(indi == 'Stoch' and stochbh and StochAboveLine ? #ef5350 : na, transp=90, title="Overbought Stoch")
+bgcolor(indi == 'Stoch' and stochbh and StochBelowLine ? #26a69a : na, transp=90, title="Oversold Stoch")
+bgcolor(indi == 'Stoch' and stochch and stochcrossUp ? #26a69a : na, transp=60, title="Overbought Stoch Cross")
+bgcolor(indi == 'Stoch' and stochch and stochcrossDn ? #ef5350 : na, transp=60, title="Oversold Stoch Cross")
+
+//Background color for any stoch crosses
+bgcolor(indi == 'Stoch' and stochac and stochcrossUpAll ? #26a69a : na, transp=70, title="Stoch Cross")
+bgcolor(indi == 'Stoch' and stochac and stochcrossDownAll ? #ef5350 : na, transp=70, title="Stoch Cross")
