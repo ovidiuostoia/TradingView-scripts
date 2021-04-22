@@ -1,0 +1,76 @@
+//@version=4
+study(title="EMA/MA", shorttitle="EMAS", overlay=true)
+
+// General inputs
+is_show_label = input(true, type=input.bool, title="Show Pi Cycle Top", group="General Settings")
+is_show_emas = input(true, type=input.bool, title="Show EMAS", group="General Settings")
+is_show_smas = input(true, type=input.bool, title="Show MAS", group="General Settings")
+is_show_bb = input(true, type=input.bool, title="Show Bollinger Bands", group="General Settings")
+
+len1 = input(9, minval=1, title="EMA 1", group="EMAS Settings")
+len2 = input(21, minval=1, title="EMA 2", group="EMAS Settings")
+len3 = input(50, minval=1, title="EMA 3", group="EMAS Settings")
+len4 = input(100, minval=1, title="EMA 4", group="EMAS Settings")
+len5 = input(200, minval=1, title="EMA 5", group="EMAS Settings")
+len6 = input(10, minval=1, title="MA 1", group="MAS Settings")
+len7 = input(200, minval=1, title="MA 2", group="MAS Settings")
+len8 = input(1200, minval=1, title="MA 3", group="MAS Settings")
+
+src1 = input(close, title="EMA 1 source", group="EMAS Settings")
+src2 = input(close, title="EMA 2 source", group="EMAS Settings")
+src3 = input(close, title="EMA 3 source", group="EMAS Settings")
+src4 = input(close, title="EMA 4 source", group="EMAS Settings")
+src5 = input(close, title="EMA 5 source", group="EMAS Settings")
+src6 = input(close, title="MA 1 source", group="MAS Settings")
+src7 = input(close, title="MA 2 source", group="MAS Settings")
+src8 = input(close, title="MA 3 source", group="MAS Settings")
+
+// Pi Cycle inputs
+len_ma_long = input(350, minval=1, title="Long Moving Average", group="Pi Cycle Settings")
+len_ma_short = input(111, minval=1, title="Short Moving Average", group="Pi Cycle Settings")
+resolution = input('D', type=input.string, title="Time interval", group="Pi Cycle Settings")
+is_show_ma = input(false, type=input.bool, title="Show Moving Averages", group="Pi Cycle Settings")
+is_alert = input(true, type=input.bool, title="Send an alert on Pi Cycle Top", group="Pi Cycle Settings")
+
+// Bollinger Bands inputs
+bb_length = input(20, minval=1, title="Length", group="Bollinger Settings")
+bb_src = input(close, title="Source", group="Bollinger Settings")
+bb_mult = input(2.0, minval=0.001, maxval=50, title="StdDev", group="Bollinger Settings")
+bb_offset = input(0, "Offset", type = input.integer, minval = -500, maxval = 500, group="Bollinger Settings")
+
+// Pi Cycle calculation
+ma_long = security(syminfo.tickerid, resolution, sma(close, len_ma_long)*2)
+ma_short = security(syminfo.tickerid, resolution, sma(close, len_ma_short))
+src = security(syminfo.tickerid, resolution, close)
+PiCycleTop = crossunder(ma_long, ma_short) ? src + (src/100 * 10) : na
+
+// Bollinger calculation
+bb_basis = sma(src, bb_length)
+bb_dev = bb_mult * stdev(src, bb_length)
+bb_upper = bb_basis + bb_dev
+bb_lower = bb_basis - bb_dev
+
+
+// EMA/MA plots
+plot(is_show_emas ? ema(src1, len1) : na, color=#8b0000, title="EMA 1",linewidth=1)
+plot(is_show_emas ? ema(src2, len2) : na, color=#bc7700, title="EMA 2",linewidth=1)
+plot(is_show_emas ? ema(src3, len3) : na, color=#9a00cd, title="EMA 3",linewidth=1)
+plot(is_show_emas ? ema(src4, len4) : na, color=#2331eb, title="EMA 4",linewidth=1)
+plot(is_show_emas ? ema(src5, len5) : na, color=#2331eb, title="EMA 5",linewidth=1)
+plot(is_show_smas ? sma(src6, len6) : na, color=#00fcff, title="MA 1",linewidth=2)
+plot(is_show_smas ? sma(src7, len7) : na, color=#f0ff00, title="MA 2",linewidth=2)
+plot(is_show_smas ? sma(src8, len8) : na, color=#b4b4b4, title="MA 3",linewidth=2)
+
+
+// Pi Cycle plots
+plot(is_show_ma ? ma_long : na, color=color.green)
+plot(is_show_ma ? ma_short : na, color=color.red)
+
+plotshape(is_show_label ? PiCycleTop : na, style=shape.labeldown,size=size.normal, text="Pi Cycle top", color=color.red, textcolor=color.white, location=location.absolute)
+alertcondition(condition=PiCycleTop, title="Pi Cycle", message="The Pi Cycle Top has been reached, historically Bitcoin tops within 3 days of reaching this ratio, More info : https://medium.com/@positivecrypto/the-golden-ratio-multiplier-c2567401e12a")
+
+// Bollinger plots
+plot(is_show_bb ? bb_basis : na, "Basis", color=#872323, offset = bb_offset)
+p1 = plot(is_show_bb ? bb_upper : na, "Upper", color=color.teal, offset = bb_offset)
+p2 = plot(is_show_bb ? bb_lower : na, "Lower", color=color.teal, offset = bb_offset)
+fill(p1, p2, title = "Background", color=#198787, transp=95)
